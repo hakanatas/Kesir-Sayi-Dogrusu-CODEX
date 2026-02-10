@@ -20,6 +20,9 @@
   const CAM_W = 160;
   const CAM_H = 120;
   const MAX_LIVES = 4;
+  const AUTO_LOOP_VARIANT = true;
+  const AUTO_LEVEL_LIMIT = 3;
+  const TOTAL_SOLVED_STORAGE_KEY = "kesir-kasifi-total-solved-v1";
   const THEME = {
     teal: "#22495A",
     darkTeal: "#1A3642",
@@ -154,6 +157,36 @@
     return text.replace(".", ",");
   }
 
+  function readPersistedTotalSolved() {
+    try {
+      const raw = window.localStorage.getItem(TOTAL_SOLVED_STORAGE_KEY);
+      if (!raw) {
+        return 0;
+      }
+      const parsed = JSON.parse(raw);
+      const total = Number(parsed.totalSolved);
+      if (!Number.isFinite(total) || total < 0) {
+        return 0;
+      }
+      return Math.floor(total);
+    } catch {
+      return 0;
+    }
+  }
+
+  function writePersistedTotalSolved(totalSolved) {
+    try {
+      const safeTotal = Math.max(0, Math.floor(totalSolved));
+      const payload = {
+        totalSolved: safeTotal,
+        updatedAt: Date.now(),
+      };
+      window.localStorage.setItem(TOTAL_SOLVED_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // localStorage erişimi engelliyse oyun akışını bozma.
+    }
+  }
+
   function extractDenominator(label) {
     if (typeof label !== "string") {
       return null;
@@ -217,13 +250,13 @@
   function makeLevel2MixedQuestion() {
     const den = pick([2, 3, 4, 5, 6, 8]);
     const whole = randInt(1, 2);
-    let num = randInt(1, den - 1);
-    let guard = 0;
-    // Denk kesir görünümünü engellemek için pay/payda aralarında asal seç.
-    while (gcd(num, den) !== 1 && guard < 24) {
-      num = randInt(1, den - 1);
-      guard += 1;
+    const numerators = [];
+    for (let i = 1; i < den; i += 1) {
+      if (gcd(i, den) === 1) {
+        numerators.push(i);
+      }
     }
+    const num = pick(numerators);
     return {
       value: whole + num / den,
       label: `${whole} ${num}/${den}`,
@@ -305,7 +338,7 @@
     };
   }
 
-  const LEVELS = [
+  const ALL_LEVELS = [
     {
       id: "L1",
       name: "Kesir Isınması",
@@ -417,6 +450,8 @@
     },
   ];
 
+  const LEVELS = ALL_LEVELS.slice(0, AUTO_LEVEL_LIMIT);
+
   const cameraVideo = document.createElement("video");
   cameraVideo.autoplay = true;
   cameraVideo.muted = true;
@@ -426,6 +461,7 @@
   cameraSampleCanvas.width = CAM_W;
   cameraSampleCanvas.height = CAM_H;
   const cameraSampleCtx = cameraSampleCanvas.getContext("2d", { willReadFrequently: true });
+  const initialTotalSolved = readPersistedTotalSolved();
 
   const state = {
     mode: "menu",
@@ -498,6 +534,9 @@
     questionCueLabel: "",
     lastTick: performance.now(),
     tickPulse: 0,
+    totalSolvedAllTime: initialTotalSolved,
+    lastPersistedTotalSolved: initialTotalSolved,
+    persistAccumulator: 0,
   };
 
   function pointInRect(point, rect) {
@@ -594,7 +633,7 @@
       const q = currentQuestion();
       const timerText = state.level.timeLimit > 0 ? ` | Süre: ${state.timeLeft.toFixed(1)} sn` : "";
       const modeText = state.inputMode === "camera" ? "kamera" : "fare/dokunmatik";
-      ui.hint.textContent = `Seviye ${state.levelIndex + 1}/${LEVELS.length} (${state.level.name}) | Hedef: ${q ? q.label : "-"} | Can: ${state.lives} | Skor: ${state.score} | Mod: ${modeText}${timerText}`;
+      ui.hint.textContent = `Seviye ${state.levelIndex + 1}/${LEVELS.length} (${state.level.name}) | Hedef: ${q ? q.label : "-"} | Can: ${state.lives} | Skor: ${state.score} | Toplam Çözülen: ${state.totalSolvedAllTime} | Mod: ${modeText}${timerText}`;
       return;
     }
 
@@ -608,7 +647,7 @@
       return;
     }
 
-    ui.hint.textContent = `Klavye: 1-${LEVELS.length} seviye seç, 0 menü, Sol/Sağ konum, Space/Enter kilitle, C kamera, F tam ekran.`;
+    ui.hint.textContent = `Toplam Çözülen: ${state.totalSolvedAllTime} | Klavye: 1-${LEVELS.length} seviye seç, 0 menü, Sol/Sağ konum, Space/Enter kilitle, C kamera, F tam ekran.`;
   }
 
   function updateCameraButtonText() {
@@ -641,6 +680,31 @@
     state.feedback = text;
     state.feedbackType = type;
     state.feedbackT = duration;
+  }
+
+  function persistTotalSolved(force = false) {
+    if (!force && state.totalSolvedAllTime === state.lastPersistedTotalSolved) {
+      return;
+    }
+    writePersistedTotalSolved(state.totalSolvedAllTime);
+    state.lastPersistedTotalSolved = state.totalSolvedAllTime;
+    state.persistAccumulator = 0;
+  }
+
+  async function ensureAutoCameraMode() {
+    if (!AUTO_LOOP_VARIANT) {
+      return;
+    }
+    if (state.inputMode === "camera" && state.camera.active) {
+      return;
+    }
+    const ok = await ensureCameraActive();
+    if (!ok) {
+      return;
+    }
+    state.inputMode = "camera";
+    setFeedback("Kamera otomatik aktif.", "info", 1.2);
+    updateUI();
   }
 
   function triggerFlash(color, duration) {
@@ -734,6 +798,10 @@
       triggerQuestionCue(nextQuestion.label, 1.2);
     }
 
+    if (AUTO_LOOP_VARIANT) {
+      void ensureAutoCameraMode();
+    }
+
     updateUI();
   }
 
@@ -762,6 +830,11 @@
   }
 
   function returnToMenu() {
+    if (AUTO_LOOP_VARIANT) {
+      startCampaignFromLevel(0);
+      void ensureAutoCameraMode();
+      return;
+    }
     state.mode = "menu";
     state.level = null;
     state.questions = [];
@@ -778,6 +851,19 @@
   function handleQuestionAdvance() {
     state.questionIndex += 1;
     if (state.questionIndex >= state.questions.length) {
+      if (AUTO_LOOP_VARIANT) {
+        const isLastLevel = state.levelIndex >= LEVELS.length - 1;
+        const nextLevelIndex = isLastLevel ? 0 : state.levelIndex + 1;
+        setFeedback(
+          isLastLevel
+            ? "Son bölüm tamamlandı. Döngü yeniden 1. bölümden başlıyor."
+            : `${state.level.name} tamamlandı. Sonraki bölüme geçiliyor.`,
+          "success",
+          1.8
+        );
+        beginLevel(nextLevelIndex);
+        return;
+      }
       if (state.levelIndex >= LEVELS.length - 1) {
         state.mode = "game_complete";
         setFeedback("Bütün kesir sistemleri dengelendi.", "success", 3);
@@ -819,6 +905,8 @@
       state.score += gain;
       state.levelScore += 1;
       state.combo += 1;
+      state.totalSolvedAllTime += 1;
+      persistTotalSolved(true);
       setFeedback(`DOĞRU! ${question.label} bulundu. +${gain} puan`, "success", 2.4);
       triggerFlash("22, 163, 74", 0.18);
       spawnParticles(valueToX(question.value), getLineGeometry().y - 6, "#2fbf71", 22);
@@ -834,6 +922,13 @@
       spawnParticles(valueToX(state.markerValue), getLineGeometry().y - 6, "#e65100", 16);
 
       if (state.lives <= 0) {
+        if (AUTO_LOOP_VARIANT) {
+          state.lives = MAX_LIVES;
+          state.combo = 0;
+          setFeedback("Canlar bitti. Döngü yeniden 1. bölümden başlıyor.", "warning", 2.2);
+          beginLevel(0);
+          return;
+        }
         setFeedback("Canlar bitti. Kampanyayı yeniden başlat.", "error", 2.8);
         state.mode = "menu";
         updateUI();
@@ -854,6 +949,13 @@
     triggerDamageFeedback(previousLives, state.lives);
 
     if (state.lives <= 0) {
+      if (AUTO_LOOP_VARIANT) {
+        state.lives = MAX_LIVES;
+        state.combo = 0;
+        setFeedback("Süre bitti ve canlar tükendi. Döngü 1. bölümden yeniden başlıyor.", "warning", 2.4);
+        beginLevel(0);
+        return;
+      }
       setFeedback("Süreyi yetiştiremedin. Yeniden dene.", "error", 2.8);
       state.mode = "menu";
       updateUI();
@@ -940,6 +1042,11 @@
 
   async function toggleCameraMode() {
     if (state.inputMode === "camera") {
+      if (AUTO_LOOP_VARIANT) {
+        setFeedback("Bu sürümde kamera otomatik ve sürekli aktif.", "info", 1.6);
+        updateUI();
+        return;
+      }
       state.inputMode = "pointer";
       setFeedback("Kamera imleci pasif.", "info", 1.2);
       updateUI();
@@ -1597,6 +1704,11 @@
       }
     }
 
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(24, 66, 85, 0.84)";
+    ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.fillText(`Toplam Çözülen ${state.totalSolvedAllTime}`, rightX, canvas.height * 0.235);
+
     if (state.lifeDropT > 0 && state.lifeDropText) {
       const badgeAlpha = clamp(state.lifeDropT / 1.2, 0, 1);
       const bx = rightX - 156;
@@ -2077,6 +2189,10 @@
 
   function update(dt) {
     state.tickPulse += dt;
+    state.persistAccumulator += dt;
+    if (state.persistAccumulator >= 8) {
+      persistTotalSolved(false);
+    }
 
     if (state.feedbackT > 0) {
       state.feedbackT = Math.max(0, state.feedbackT - dt);
@@ -2338,7 +2454,13 @@
   });
 
   window.addEventListener("beforeunload", () => {
+    persistTotalSolved(true);
     stopCamera();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      persistTotalSolved(true);
+    }
   });
 
   window.render_game_to_text = () => {
@@ -2359,6 +2481,7 @@
       inputMode: state.inputMode,
       score: state.score,
       lives: state.lives,
+      totalSolvedAllTime: state.totalSolvedAllTime,
       question: question
         ? {
             index: state.questionIndex + 1,
@@ -2417,6 +2540,10 @@
       }
     }
     render();
+    if (AUTO_LOOP_VARIANT) {
+      startCampaignFromLevel(0);
+      void ensureAutoCameraMode();
+    }
     requestAnimationFrame(frame);
   }
 

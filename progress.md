@@ -143,3 +143,18 @@ TODO / Sonraki ajan notlari:
   - `output/menu-text-bigger-check-v3/shot-0.png` (menü metinleri büyütülmüş ve çakışmasız)
   - `output/new-level-sprint-check/shot-0.png` + `state-0.json` (karttan yeni seviye açılıyor; `id: L2S`, `index: 3`)
   - `output/new-level-motion-check/state-0.json` (kayan hatın yavaş hareketi için görsel aralık kayması doğrulandı)
+
+- Yeni varyant (otomatik kamera + 3 bölüm döngü) eklendi:
+  - Oyun yalnızca ilk 3 bölümle çalışacak şekilde sınırlandı (`LEVELS = ALL_LEVELS.slice(0, 3)`).
+  - Uygulama açılır açılmaz kampanya otomatik başlıyor (1. bölüm).
+  - Seviye bitişlerinde otomatik sonraki bölüme geçiliyor; son bölüm bitince otomatik 1. bölüme dönüyor.
+  - Bu varyantta kamera otomatik açılmaya çalışıyor ve seviye başlangıçlarında yeniden otomatik deneniyor.
+  - `C` ile kamerayı kapatma engellendi (varyant gereği sürekli aktif tutma davranışı).
+- Kalıcı toplam çözüm sayacı:
+  - `localStorage` tabanlı sayaç eklendi (`kesir-kasifi-total-solved-v1`).
+  - Her doğru cevapta artırılıp anında kaydediliyor.
+  - Periyodik (8 sn) yedek kaydetme + `beforeunload` ve `visibilitychange` sırasında zorunlu kaydetme eklendi.
+  - HUD ve `render_game_to_text` içine `totalSolvedAllTime` eklendi.
+- Doğrulama:
+  - `output/auto-loop-start-check/shot-0.png` + `state-0.json` (otomatik başlangıç + toplam sayaç görünümü)
+  - `output/auto-variant-final-check/shot-0.png` + `state-0.json`
