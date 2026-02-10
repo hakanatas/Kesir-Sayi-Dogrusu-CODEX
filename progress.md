@@ -50,3 +50,96 @@ TODO / Sonraki ajan notlari:
   - MediaPipe Hands tabanlı AI takip entegrasyonu eklendi (yüklenirse otomatik devreye girer).
   - AI yüklenemezse geliştirilmiş skin-motion fallback çalışır.
   - Takip türü etiketi (`AI/basic`) ve güven göstergesi korundu.
+
+## 2026-02-10
+- Kullanıcı bildirimi doğrultusunda metin kayması kontrol edildi (`output/text-shift-check`).
+- Sorun doğrulandı: menüye dönüşte geri bildirim bandı menü paneli ile çakışıyordu.
+- `game.js` içinde `drawFeedback` yerleşimi güncellendi:
+  - Menü modunda bandın panel altına, sığmazsa panel üstüne taşınması sağlandı.
+  - Ekran sınırı clamp'i eklendi (üst/alt taşma engeli).
+  - Uzun geri bildirim metinleri için dinamik satır sarma + font küçültme eklendi.
+- Wrap algoritması ortaklaştırıldı (`wrapTextLines`) ve merkez metin çiziminde tekrar kullanıldı.
+- Regresyon turu çalıştırıldı (`output/text-shift-check-fixed`), yeni `errors-*.json` oluşmadı.
+- Yeni kullanıcı geri bildirimi üzerine kamera takip ve menü alt metni tekrar ele alındı.
+- Kamera takipte AI akışı güçlendirildi:
+  - `hands.send()` hatasında AI takip devreden çıkıp basic moda kalıcı geçiş yapıyor.
+  - AI eli kısa süre göremezse aynı döngüde basic takip devralıyor (hibrit fallback).
+  - Düşük güven anında dwell yanlış tetiklemelerini azaltan güvenlik adımı eklendi.
+- Menü alt metni düzenlendi:
+  - "Başlat: ..." satırı panel merkezinde çiziliyor.
+  - Seviye listesi ile alt satır arası boşluk artırıldı.
+- Regresyon ve hizalama kontrolleri:
+  - `output/menu-align-check-v2`
+  - `output/regression-after-camera-fallback-fix`
+  - Yeni `errors-*.json` oluşmadı.
+- Sayı doğrusu okunabilirlik ve soru geçiş geri bildirimi iyileştirildi:
+  - `0` noktası için belirgin vurgu eklendi (özel çizgi + rozet/etiket).
+  - Bölme çizgileri (major/half/minor) daha net hale getirildi (kalınlık + kontrast artırımı).
+  - Soru değişiminde "Yeni hedef: ..." geçiş animasyonu eklendi.
+- Yeni doğrulama çıktıları:
+  - `output/line-zero-and-cue-check`
+  - `output/numberline-clarity-regression`
+  - Yeni `errors-*.json` oluşmadı.
+- Hedef sayı mizanpajı iyileştirildi:
+  - Üst kartta hedef bilgi bölümü ayrı bir "HEDEF SAYI" kartına taşındı.
+  - Kartta kesir değeri ve yaklaşık ondalık değeri birlikte gösteriliyor.
+  - Kartta sürekli hafif pulse + soru geçişinde güçlenen kısa animasyon eklendi.
+- İlk 4 seviye (L1-L4) için tam sayı işaretleri güçlendirildi:
+  - `0` ile birlikte görünür aralıktaki tüm tam sayılar (örn. `-2,-1,0,1,2,3`) etiketleniyor.
+  - `0` özel vurgu rengini koruyor, diğer tam sayılar ikincil vurgu ile çiziliyor.
+- Bu tur doğrulama çıktıları:
+  - `output/target-layout-check-v2`
+  - `output/target-layout-regression-v2`
+  - Yeni `errors-*.json` oluşmadı.
+- Yeni kullanıcı geri bildirimi (metin kayması + L1 bölme adımı) uygulandı:
+  - Üst kartta `Soru`/`İpucu` satırları card içinde yeniden konumlandırıldı (taşma/kayma azaltıldı).
+  - `İpucu` metni card alanına göre dinamik font küçültme ile çiziliyor.
+  - Seviye 1'de aktif bölme adımı hedef kesrin paydasına bağlandı (örn. `1/4` için 4 bölüm, `1/8` için 8 bölüm).
+  - Bu adım çizim, marker snap ve klavye adım hareketi için ortak kullanılıyor (`getActiveTickStep`).
+- Doğrulama:
+  - `output/text-shift-fix-check/shot-0.png` üzerinde metin yerleşimi ve L1 `1/4` bölmesi kontrol edildi.
+- Kullanıcı talebiyle giriş ekranı (menü modu) baştan düzenlendi:
+  - Menü paneli daha net bir bilgi mimarisiyle yeniden tasarlandı (başlık + açıklama + seviye menü kartları + hızlı kontrol şeridi).
+  - 6 seviye 2x3 kart düzeninde gösteriliyor; her kartta seviye adı + kısa açıklama var.
+  - Birinci seviye kartına hafif vurgu/pulse eklendi.
+  - Alt kontrol satırı menü odaklı biçimde sadeleştirildi.
+- Yeni doğrulama çıktıları:
+  - `output/menu-redesign-check/shot-0.png`
+  - `output/menu-redesign-start-check/shot-0.png`
+  - Yeni `errors-*.json` oluşmadı.
+- Menü geri bildirimi turu:
+  - Alt kontrol bölümü daha ferah iki şeritli yapıya çevrildi (ana aksiyon + kısa kısayollar).
+  - Menü seviye kartları etkileşimli hale getirildi: karta tıklayınca ilgili seviye doğrudan başlıyor.
+  - Hover desteği eklendi (kart üstünde pointer cursor + hover çerçeve vurgusu).
+- Bu tur doğrulama:
+  - `output/menu-footer-cleanup-check/shot-0.png` (alt bölüm düzeni)
+  - `output/menu-card-click-check-v2/shot-0.png` + `state-0.json` (kart tıklama ile seviye başlangıcı)
+
+- Menü/typography sıkışma düzeltmesi (takip turu):
+  - Menü 7 seviyeli kompakt düzende kart yüksekliği/satır aralığı yeniden ölçeklendirildi.
+  - Alt iki bilgi şeridi ile kart ızgarası arasındaki boşluk artırıldı (taşma/çakışma azaltıldı).
+  - Oyun üst kartında (`Seviye/Soru/İpucu`) dikey yerleşim daha dayanıklı hale getirildi (card yüksekliğine bağlı hesap).
+  - Hedef sayı kartında metin boyutu hedef etikete göre dinamik küçültme ile taşma azaltıldı.
+- Doğrulama çıktıları:
+  - `output/menu-layout-postfix/shot-0.png` (7 seviye menü alt bölüm yerleşimi)
+  - `output/menu-click-level2-postfix/shot-0.png` + `state-0.json` (menüden kart tıkla -> Seviye 2/Tam Sayılı Geçiş açılıyor)
+  - `output/menu-click-level1-postfix/shot-0.png` + `state-0.json` (Seviye 1 açılıyor, soru sayısı 6)
+
+- Yeni kullanıcı isteği uygulandı:
+  - 2. seviyeden sonra yeni bir seviye eklendi: `L2S` / `Kayan Hat Sprint`.
+  - Bu yeni seviyede soru havuzu sadece 1. ve 2. seviye zorluğundan üretiliyor:
+    - temel kesirler (`1/2`, `1/4`, `3/4`, `1/8`, `7/8`, `3/8`)
+    - tam sayılı kesirler (`1 3/4`, `2 5/8` vb.)
+  - Yeni seviye kayan hat modunda ama yavaş:
+    - `moveSpeed: 0.42`
+    - `moveAmplitude: 0.1`
+    - `timeLimit: 13`, `questions: 8`
+  - Hareket sistemi seviye bazlı hale getirildi (`moveSpeed`, `moveAmplitude` opsiyonel).
+  - Eski ileri seviye kayan hatın adı karışmaması için `Kayan Hat Turbo` yapıldı.
+- Menü metinleri büyütüldü:
+  - Menü başlığı, alt açıklama, "SEVİYE MENÜSÜ" etiketi ve alt kısayol şerit yazıları büyütüldü.
+  - Büyütme sonrası çakışmayı önlemek için başlık/açıklama/ızgara aralığı yeniden ayarlandı.
+- Yeni doğrulama:
+  - `output/menu-text-bigger-check-v3/shot-0.png` (menü metinleri büyütülmüş ve çakışmasız)
+  - `output/new-level-sprint-check/shot-0.png` + `state-0.json` (karttan yeni seviye açılıyor; `id: L2S`, `index: 3`)
+  - `output/new-level-motion-check/state-0.json` (kayan hatın yavaş hareketi için görsel aralık kayması doğrulandı)
