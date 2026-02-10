@@ -20,7 +20,15 @@
   const CAM_W = 160;
   const CAM_H = 120;
   const MAX_LIVES = 4;
-  const AUTO_LOOP_VARIANT = true;
+  const AUTO_LOOP_VARIANT = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("loop")) {
+        return params.get("loop") !== "0" && params.get("loop") !== "false";
+      }
+    } catch { /* default */ }
+    return true;
+  })();
   const AUTO_LEVEL_LIMIT = 3;
   const TOTAL_SOLVED_STORAGE_KEY = "kesir-kasifi-total-solved-v1";
   const THEME = {
@@ -33,6 +41,81 @@
     muted: "#6B7280",
     softWhite: "rgba(255, 255, 255, 0.9)",
   };
+
+  const FONT = {
+    sans: "'Noto Sans', 'Outfit', sans-serif",
+    serif: "'Noto Serif', 'Forum', 'Caudex', serif",
+  };
+  FONT.title = (size) => `700 ${size}px ${FONT.serif}`;
+  FONT.bold = (size) => `700 ${size}px ${FONT.sans}`;
+  FONT.semi = (size) => `600 ${size}px ${FONT.sans}`;
+
+  // ── Sound system (Web Audio API) ──
+  const SFX = (() => {
+    let audioCtx = null;
+
+    function ctx() {
+      if (!audioCtx) {
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch {
+          return null;
+        }
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    function tone(freq, duration, type = "sine", gain = 0.18) {
+      const ac = ctx();
+      if (!ac) return;
+      const osc = ac.createOscillator();
+      const vol = ac.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      vol.gain.setValueAtTime(gain, ac.currentTime);
+      vol.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+      osc.connect(vol);
+      vol.connect(ac.destination);
+      osc.start(ac.currentTime);
+      osc.stop(ac.currentTime + duration);
+    }
+
+    return {
+      correct() {
+        tone(523, 0.1, "sine", 0.16);
+        setTimeout(() => tone(659, 0.1, "sine", 0.14), 80);
+        setTimeout(() => tone(784, 0.18, "sine", 0.12), 160);
+      },
+      wrong() {
+        tone(220, 0.22, "square", 0.1);
+        setTimeout(() => tone(185, 0.28, "square", 0.08), 120);
+      },
+      timeout() {
+        tone(330, 0.15, "triangle", 0.12);
+        setTimeout(() => tone(262, 0.15, "triangle", 0.1), 120);
+        setTimeout(() => tone(196, 0.3, "triangle", 0.08), 240);
+      },
+      newQuestion() {
+        tone(440, 0.08, "sine", 0.08);
+        setTimeout(() => tone(554, 0.1, "sine", 0.06), 60);
+      },
+      levelComplete() {
+        tone(523, 0.12, "sine", 0.14);
+        setTimeout(() => tone(659, 0.1, "sine", 0.12), 100);
+        setTimeout(() => tone(784, 0.1, "sine", 0.12), 200);
+        setTimeout(() => tone(1047, 0.28, "sine", 0.1), 300);
+      },
+      gameOver() {
+        tone(392, 0.18, "triangle", 0.12);
+        setTimeout(() => tone(330, 0.18, "triangle", 0.1), 160);
+        setTimeout(() => tone(262, 0.18, "triangle", 0.1), 320);
+        setTimeout(() => tone(196, 0.4, "triangle", 0.08), 480);
+      },
+    };
+  })();
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -480,7 +563,7 @@
     elapsedInLevel: 0,
     timeLeft: 0,
     lineShift: 0,
-    feedback: "Oyunu başlat ve gezegenlere kesir yolu çiz.",
+    feedback: "☝️ İşaret parmağını kaldır ve kesri doğru yere sürükle!",
     feedbackType: "info",
     feedbackT: 0,
     particles: [],
@@ -513,6 +596,7 @@
       lastMotion: 0,
       trackingConfidence: 0,
       tracker: "basic",
+      indexFingerVisible: false,
       ml: {
         loading: false,
         loaded: false,
@@ -618,12 +702,20 @@
     }
 
     while (picked.length < level.questions) {
-      const span = level.range[1] - level.range[0];
-      const value = level.range[0] + Math.random() * span;
+      const den = pick([2, 3, 4, 5, 6]);
+      const minNum = Math.ceil(level.range[0] * den);
+      const maxNum = Math.floor(level.range[1] * den);
+      const num = randInt(minNum, maxNum);
+      if (num === 0) continue;
+      const simplified = simplifyFraction(num, den);
+      const value = simplified.num / simplified.den;
+      const key = Math.round(value * 10000) / 10000;
+      if (seen.has(key)) continue;
+      seen.add(key);
       picked.push({
         value,
-        label: toFractionLabel(value, 10),
-        tip: "Serbest atış",
+        label: `${simplified.num}/${simplified.den}`,
+        tip: "Ekstra soru",
       });
     }
 
@@ -705,7 +797,7 @@
       return;
     }
     state.inputMode = "camera";
-    setFeedback("Kamera otomatik aktif.", "info", 1.2);
+    setFeedback("☝️ Kamera aktif — İşaret parmağını kaldır ve kesri doğru noktaya sürükle!", "info", 2.4);
     updateUI();
   }
 
@@ -756,12 +848,24 @@
     }
   }
 
+  function hapticTick() {
+    try {
+      if (navigator.vibrate) {
+        navigator.vibrate(4);
+      }
+    } catch { /* not supported */ }
+  }
+
   function setMarkerFromCanvasX(x) {
     if (!state.level) {
       return;
     }
+    const prev = state.markerValue;
     const value = xToValue(x);
     state.markerValue = normalizeMarkerValue(value);
+    if (state.markerValue !== prev) {
+      hapticTick();
+    }
   }
 
   function normalizeMarkerValue(value) {
@@ -793,7 +897,7 @@
     state.markerValue = normalizeMarkerValue(center);
 
     if (state.level.cameraFocus && state.inputMode !== "camera") {
-      setFeedback(`Seviye ${index + 1} başladı: ${state.level.name} | Kamera modu tavsiye edilir (C)`, "info", 2.2);
+      setFeedback(`Seviye ${index + 1} başladı: ${state.level.name} | ☝️ İşaret parmağınla oyna! (C)`, "info", 2.4);
     }
     const nextQuestion = currentQuestion();
     if (nextQuestion) {
@@ -856,6 +960,7 @@
       if (AUTO_LOOP_VARIANT) {
         const isLastLevel = state.levelIndex >= LEVELS.length - 1;
         const nextLevelIndex = isLastLevel ? 0 : state.levelIndex + 1;
+        SFX.levelComplete();
         setFeedback(
           isLastLevel
             ? "Son bölüm tamamlandı. Döngü yeniden 1. bölümden başlıyor."
@@ -868,9 +973,11 @@
       }
       if (state.levelIndex >= LEVELS.length - 1) {
         state.mode = "game_complete";
+        SFX.levelComplete();
         setFeedback("Bütün kesir sistemleri dengelendi.", "success", 3);
       } else {
         state.mode = "level_clear";
+        SFX.levelComplete();
         setFeedback(`${state.level.name} temizlendi.`, "success", 2.6);
       }
       updateUI();
@@ -880,6 +987,7 @@
     state.timeLeft = state.level.timeLimit;
     const nextQuestion = currentQuestion();
     if (nextQuestion) {
+      SFX.newQuestion();
       triggerQuestionCue(nextQuestion.label, 1.05);
     }
   }
@@ -895,7 +1003,7 @@
     }
 
     const span = state.level.range[1] - state.level.range[0];
-    const tolerance = state.level.exactOnly ? 0.0008 : span * state.level.tolerance;
+    const tolerance = state.level.exactOnly ? 0.005 : span * state.level.tolerance;
     const error = Math.abs(state.markerValue - question.value);
     const correct = error <= tolerance;
 
@@ -910,6 +1018,7 @@
       state.totalSolvedAllTime += 1;
       persistTotalSolved(true);
       setFeedback(`DOĞRU! ${question.label} bulundu. +${gain} puan`, "success", 2.4);
+      SFX.correct();
       triggerFlash("22, 163, 74", 0.18);
       spawnParticles(valueToX(question.value), getLineGeometry().y - 6, "#2fbf71", 22);
 
@@ -920,6 +1029,7 @@
       state.lives -= 1;
       state.combo = 0;
       setFeedback(`YANLIŞ! Hedef ${question.label}. Can -1 (${previousLives} -> ${state.lives})`, "error", 3);
+      SFX.wrong();
       triggerDamageFeedback(previousLives, state.lives);
       spawnParticles(valueToX(state.markerValue), getLineGeometry().y - 6, "#e65100", 16);
 
@@ -927,10 +1037,12 @@
         if (AUTO_LOOP_VARIANT) {
           state.lives = MAX_LIVES;
           state.combo = 0;
+          SFX.gameOver();
           setFeedback("Canlar bitti. Döngü yeniden 1. bölümden başlıyor.", "warning", 2.2);
           beginLevel(0);
           return;
         }
+        SFX.gameOver();
         setFeedback("Canlar bitti. Oyunu yeniden başlat.", "error", 2.8);
         state.mode = "menu";
         updateUI();
@@ -948,16 +1060,19 @@
     state.lives -= 1;
     state.combo = 0;
     setFeedback(`SÜRE DOLDU! Can -1 (${previousLives} -> ${state.lives})`, "warning", 2.4);
+    SFX.timeout();
     triggerDamageFeedback(previousLives, state.lives);
 
     if (state.lives <= 0) {
       if (AUTO_LOOP_VARIANT) {
         state.lives = MAX_LIVES;
         state.combo = 0;
+        SFX.gameOver();
         setFeedback("Süre bitti ve canlar tükendi. Döngü 1. bölümden yeniden başlıyor.", "warning", 2.4);
         beginLevel(0);
         return;
       }
+      SFX.gameOver();
       setFeedback("Süreyi yetiştiremedin. Yeniden dene.", "error", 2.8);
       state.mode = "menu";
       updateUI();
@@ -1045,7 +1160,7 @@
   async function toggleCameraMode() {
     if (state.inputMode === "camera") {
       if (AUTO_LOOP_VARIANT) {
-        setFeedback("Bu sürümde kamera otomatik ve sürekli aktif.", "info", 1.6);
+        setFeedback("☝️ Kamera sürekli aktif — İşaret parmağınla kesri hareket ettir!", "info", 2);
         updateUI();
         return;
       }
@@ -1062,7 +1177,7 @@
     }
 
     state.inputMode = "camera";
-    setFeedback("Kamera imleci aktif. Parmağını hareket ettir, sabit tutunca kilitler.", "info", 2.4);
+    setFeedback("☝️ Sadece işaret parmağını kaldır ve hedef noktaya götür. Sabit tutunca otomatik kilitlenir!", "info", 3);
     updateUI();
   }
 
@@ -1126,6 +1241,7 @@
         hands.onResults((results) => {
           const handsFound = results && Array.isArray(results.multiHandLandmarks) ? results.multiHandLandmarks : [];
           if (!handsFound.length) {
+            state.camera.indexFingerVisible = false;
             const unseenFor = performance.now() - ml.lastSeen;
             if (unseenFor > 180) {
               state.camera.trackingConfidence = Math.max(0, state.camera.trackingConfidence - 0.08);
@@ -1135,6 +1251,30 @@
           }
 
           const landmarks = handsFound[0];
+
+          // Sadece işaret parmağı kalkık mı kontrol et
+          // Parmak kalkık = tip landmark'ı PIP'den daha yukarıda (daha küçük y)
+          const isFingerUp = (tipIdx, pipIdx) => landmarks[tipIdx].y < landmarks[pipIdx].y;
+          const isFingerDown = (tipIdx, pipIdx) => landmarks[tipIdx].y >= landmarks[pipIdx].y;
+
+          const indexUp = isFingerUp(8, 6);       // İşaret parmağı kalkık
+          const middleDown = isFingerDown(12, 10); // Orta parmak kapalı
+          const ringDown = isFingerDown(16, 14);   // Yüzük parmağı kapalı
+          const pinkyDown = isFingerDown(20, 18);  // Serçe parmak kapalı
+
+          const onlyIndexPointing = indexUp && middleDown && ringDown && pinkyDown;
+          state.camera.indexFingerVisible = onlyIndexPointing;
+
+          if (!onlyIndexPointing) {
+            // İşaret parmağı tek başına kalkık değilse takibi durdur
+            const unseenFor = performance.now() - ml.lastSeen;
+            if (unseenFor > 120) {
+              state.camera.trackingConfidence = Math.max(0, state.camera.trackingConfidence - 0.1);
+              state.camera.lastMotion = Math.max(0, state.camera.lastMotion * 0.82);
+            }
+            return;
+          }
+
           const tip = landmarks[8];
           const pip = landmarks[6];
           const tipX = clamp(tip.x, 0, 1);
@@ -1152,7 +1292,7 @@
         ml.loaded = true;
         ml.errorText = "";
         state.camera.tracker = "ai";
-        setFeedback("Kamera AI takibi aktif.", "success", 1.8);
+        setFeedback("☝️ AI parmak takibi hazır — Sadece işaret parmağınla kontrol et!", "success", 2.2);
         return true;
       } catch (error) {
         ml.errorText = error instanceof Error ? error.message : String(error);
@@ -1363,6 +1503,10 @@
         state.camera.dwell = 0;
         state.camera.submitCooldown = Math.max(state.camera.submitCooldown, 0.5);
       }
+
+      // AI tracker yüklüyse basic fallback'e düşme — sadece işaret parmağını takip et
+      applyCameraPointerControl(sampleStepSeconds);
+      return;
     }
 
     processBasicCamera(sampleStepSeconds);
@@ -1467,7 +1611,7 @@
         ctx.stroke();
 
         const label = String(intValue);
-        ctx.font = `${isZero ? 700 : 600} ${isZero ? 18 : 16}px 'Noto Sans', 'Outfit', sans-serif`;
+        ctx.font = isZero ? FONT.bold(18) : FONT.semi(16);
         const labelW = Math.max(28, Math.ceil(ctx.measureText(label).width) + 16);
         const labelH = isZero ? 28 : 24;
         const labelX = clamp(x - labelW * 0.5, line.x - 3, line.x + line.width - labelW + 3);
@@ -1519,15 +1663,21 @@
       ctx.fillStyle = "#9a3412";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.bold(18);
       ctx.fillText("0", labelX + labelW * 0.5, labelY + labelH * 0.52);
       ctx.textBaseline = "alphabetic";
     }
 
+    const isSmallCanvas = canvas.width < 800;
+
     const markerX = valueToX(state.markerValue);
+    const markerGlow = isSmallCanvas ? 34 : 28;
+    const markerHalf = isSmallCanvas ? 20 : 16;
+    const markerTop = isSmallCanvas ? 34 : 28;
+    const markerPeak = isSmallCanvas ? 72 : 60;
     ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
     ctx.beginPath();
-    ctx.arc(markerX, line.y, 28, 0, Math.PI * 2);
+    ctx.arc(markerX, line.y, markerGlow, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "rgba(34, 73, 90, 0.22)";
     ctx.lineWidth = 2;
@@ -1537,18 +1687,19 @@
     ctx.strokeStyle = THEME.darkTeal;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(markerX, line.y - 28);
-    ctx.lineTo(markerX - 16, line.y - 60);
-    ctx.lineTo(markerX + 16, line.y - 60);
+    ctx.moveTo(markerX, line.y - markerTop);
+    ctx.lineTo(markerX - markerHalf, line.y - markerPeak);
+    ctx.lineTo(markerX + markerHalf, line.y - markerPeak);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-
+    const confirmW = Math.max(isSmallCanvas ? 100 : 120, canvas.width * (isSmallCanvas ? 0.26 : 0.18));
+    const confirmH = Math.max(isSmallCanvas ? 56 : 48, canvas.height * (isSmallCanvas ? 0.13 : 0.1));
     const confirmRect = {
-      x: canvas.width * 0.76,
+      x: canvas.width - confirmW - canvas.width * 0.04,
       y: canvas.height * 0.73,
-      w: canvas.width * 0.18,
-      h: canvas.height * 0.1,
+      w: confirmW,
+      h: confirmH,
     };
     state.confirmRect = confirmRect;
 
@@ -1565,7 +1716,7 @@
     ctx.stroke();
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "700 20px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.bold(isSmallCanvas ? 22 : 20);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("ONAYLA", confirmRect.x + confirmRect.w * 0.5, confirmRect.y + confirmRect.h * 0.52);
@@ -1612,26 +1763,26 @@
     ctx.fillStyle = THEME.teal;
     ctx.textAlign = "left";
     let titleSize = clamp(Math.round(cardH * 0.26), 22, 30);
-    ctx.font = `700 ${titleSize}px 'Noto Serif', 'Forum', 'Caudex', serif`;
+    ctx.font = FONT.title(titleSize);
     while (titleSize > 19 && ctx.measureText(titleText).width > titleMaxW) {
       titleSize -= 1;
-      ctx.font = `700 ${titleSize}px 'Noto Serif', 'Forum', 'Caudex', serif`;
+      ctx.font = FONT.title(titleSize);
     }
     ctx.fillText(titleText, titleX, titleY);
 
     const metaY = cardY + Math.max(58, cardH - 38);
     const hintY = Math.min(cardY + cardH - 12, metaY + 22);
     ctx.fillStyle = "rgba(24, 66, 85, 0.78)";
-    ctx.font = "700 15px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.bold(15);
     ctx.fillText(`Soru ${state.questionIndex + 1}/${Math.max(1, state.questions.length)}`, titleX, metaY);
     if (q) {
       const hintText = `İpucu: ${q.tip}`;
       let hintSize = 15;
       ctx.fillStyle = THEME.muted;
-      ctx.font = `600 ${hintSize}px 'Noto Sans', 'Outfit', sans-serif`;
+      ctx.font = FONT.semi(hintSize);
       while (hintSize > 12 && ctx.measureText(hintText).width > titleMaxW) {
         hintSize -= 1;
-        ctx.font = `600 ${hintSize}px 'Noto Sans', 'Outfit', sans-serif`;
+        ctx.font = FONT.semi(hintSize);
       }
       ctx.fillText(hintText, titleX, hintY);
     }
@@ -1661,27 +1812,27 @@
 
     ctx.fillStyle = "rgba(24, 66, 85, 0.78)";
     ctx.textAlign = "left";
-    ctx.font = "700 13px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.bold(13);
     ctx.fillText("HEDEF SAYI", targetX + 14, targetY + 17);
 
     ctx.fillStyle = THEME.darkTeal;
     let targetLabelSize = clamp(Math.round(targetH * 0.7), 30, 42);
-    ctx.font = `700 ${targetLabelSize}px 'Noto Sans', 'Outfit', sans-serif`;
+    ctx.font = FONT.bold(targetLabelSize);
     while (targetLabelSize > 24 && ctx.measureText(targetLabel).width > targetW * 0.62) {
       targetLabelSize -= 1;
-      ctx.font = `700 ${targetLabelSize}px 'Noto Sans', 'Outfit', sans-serif`;
+      ctx.font = FONT.bold(targetLabelSize);
     }
     ctx.fillText(targetLabel, targetX + 14, targetY + targetH - 12);
 
     ctx.fillStyle = "rgba(26, 54, 66, 0.86)";
     ctx.textAlign = "right";
-    ctx.font = "600 15px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.semi(15);
     ctx.fillText(`${isExactLevel ? "=" : "≈"} ${targetValue}`, targetX + targetW - 14, targetY + 19);
     ctx.restore();
 
     ctx.textAlign = "right";
     ctx.fillStyle = THEME.text;
-    ctx.font = "700 22px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.bold(22);
     ctx.fillText(`Skor ${state.score}`, rightX, canvas.height * 0.1);
 
     ctx.fillStyle = state.lifeDropT > 0 ? "#b91c1c" : THEME.text;
@@ -1709,7 +1860,7 @@
 
     ctx.textAlign = "right";
     ctx.fillStyle = "rgba(24, 66, 85, 0.84)";
-    ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.bold(18);
     ctx.fillText(`Toplam Çözülen ${state.totalSolvedAllTime}`, rightX, canvas.height * 0.235);
 
     if (state.lifeDropT > 0 && state.lifeDropText) {
@@ -1726,7 +1877,7 @@
 
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
-      ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.bold(18);
       ctx.textBaseline = "middle";
       ctx.fillText(state.lifeDropText, bx + bw * 0.5, by + bh * 0.52);
       ctx.textBaseline = "alphabetic";
@@ -1751,7 +1902,7 @@
       ctx.fill();
 
       ctx.fillStyle = THEME.darkTeal;
-      ctx.font = "600 14px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.semi(14);
       ctx.textAlign = "center";
       ctx.fillText(`${state.timeLeft.toFixed(1)} sn`, timerX + timerW * 0.5, timerY - 4);
     }
@@ -1780,7 +1931,7 @@
     ctx.fill();
 
     ctx.globalAlpha = alpha;
-    ctx.font = "700 24px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.bold(24);
     const textW = ctx.measureText(text).width;
     const cardW = clamp(textW + 44, 220, canvas.width * 0.64);
     const cardH = 48;
@@ -1868,7 +2019,7 @@
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.bold(18);
     ctx.fillText(style.chipText, chipX + chipW * 0.5, chipY + chipH * 0.52);
 
     const messageX = chipX + chipW + 20;
@@ -1877,19 +2028,19 @@
     ctx.textAlign = "left";
     let fontSize = 24;
     let lineHeight = 28;
-    ctx.font = `700 ${fontSize}px 'Noto Sans', 'Outfit', sans-serif`;
+    ctx.font = FONT.bold(fontSize);
     let lines = wrapTextLines(state.feedback, messageWidth);
 
     if (lines.length > 2) {
       fontSize = 20;
       lineHeight = 24;
-      ctx.font = `700 ${fontSize}px 'Noto Sans', 'Outfit', sans-serif`;
+      ctx.font = FONT.bold(fontSize);
       lines = wrapTextLines(state.feedback, messageWidth);
     }
     if (lines.length > 3) {
       fontSize = 18;
       lineHeight = 22;
-      ctx.font = `700 ${fontSize}px 'Noto Sans', 'Outfit', sans-serif`;
+      ctx.font = FONT.bold(fontSize);
       lines = wrapTextLines(state.feedback, messageWidth);
     }
 
@@ -1919,7 +2070,7 @@
     const w = canvas.width * 0.2;
     const h = w * 0.75;
     const x = canvas.width * 0.76;
-    const y = canvas.height * 0.04;
+    const y = state.mode === "playing" ? canvas.height * 0.28 : canvas.height * 0.04;
 
     ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.beginPath();
@@ -1946,11 +2097,46 @@
     ctx.stroke();
 
     ctx.fillStyle = THEME.darkTeal;
-    ctx.font = "600 13px 'Noto Sans', 'Outfit', sans-serif";
+    ctx.font = FONT.semi(13);
     ctx.textAlign = "left";
     const confidenceText = Math.round(state.camera.trackingConfidence * 100);
     const trackerLabel = state.camera.tracker === "ai" ? "AI" : "basic";
     ctx.fillText(`hareket ${Math.round(state.camera.lastMotion)} | takip %${confidenceText} | ${trackerLabel}`, x, y + h + 18);
+  }
+
+  function drawFingerGuide() {
+    // Kamera aktif + AI yüklü + işaret parmağı görünmüyorsa kalıcı yönerge göster
+    if (!state.camera.active) return;
+    if (state.inputMode !== "camera") return;
+    if (!state.camera.ml.loaded) return;
+    if (state.camera.indexFingerVisible) return;
+
+    const pulse = 0.85 + Math.sin(state.tickPulse * 4) * 0.15;
+    const bannerW = Math.min(520, canvas.width * 0.56);
+    const bannerH = 52;
+    const bannerX = (canvas.width - bannerW) * 0.5;
+    const bannerY = canvas.height * 0.48;
+
+    ctx.save();
+    ctx.globalAlpha = pulse;
+
+    // Arka plan
+    ctx.fillStyle = "rgba(34, 73, 90, 0.92)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 16);
+    ctx.fill();
+    ctx.stroke();
+
+    // Metin
+    ctx.fillStyle = "#ffffff";
+    ctx.font = FONT.bold(20);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("☝️  İşaret parmağını kaldır!", bannerX + bannerW * 0.5, bannerY + bannerH * 0.52);
+    ctx.textBaseline = "alphabetic";
+    ctx.restore();
   }
 
   function drawCenteredWrappedText(text, centerX, startY, maxWidth, lineHeight) {
@@ -2009,16 +2195,16 @@
     ctx.textAlign = "center";
     ctx.fillStyle = THEME.teal;
     const menuTitleSize = clamp(Math.round(panelH * 0.12), 48, 62);
-    ctx.font = `700 ${menuTitleSize}px 'Noto Serif', 'Forum', 'Caudex', serif`;
+    ctx.font = FONT.title(menuTitleSize);
 
     if (state.mode === "menu") {
       const titleY = panelY + 72;
       const subtitleY = panelY + 112;
       ctx.fillText("KESİR KÂŞİFİ", canvas.width * 0.5, titleY);
       const menuSubtitleSize = clamp(Math.round(panelH * 0.046), 20, 25);
-      ctx.font = `600 ${menuSubtitleSize}px 'Noto Sans', 'Outfit', sans-serif`;
+      ctx.font = FONT.semi(menuSubtitleSize);
       const subtitleLines = drawCenteredWrappedText(
-        "Bölüm seç, yöntemi belirle ve kesri doğru noktaya yerleştir.",
+        "☝️ İşaret parmağını kaldır ve kesri doğru noktaya sürükle! Sabit tutunca kilitlenir.",
         canvas.width * 0.5,
         subtitleY,
         panelW * 0.84,
@@ -2053,7 +2239,7 @@
 
       ctx.fillStyle = "rgba(24, 66, 85, 0.72)";
       ctx.textAlign = "left";
-      ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.bold(18);
       ctx.fillText("SEVİYE MENÜSÜ", panelX + gridPadX, menuLabelY);
 
       levelMeta.forEach((item, i) => {
@@ -2099,7 +2285,7 @@
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.font = `700 ${compactCards ? 14 : cardH > 70 ? 17 : 15}px 'Noto Sans', 'Outfit', sans-serif`;
+        ctx.font = FONT.bold(compactCards ? 14 : cardH > 70 ? 17 : 15);
         ctx.fillText(item.key, badgeX, badgeY + 0.5);
         ctx.textBaseline = "alphabetic";
 
@@ -2108,10 +2294,10 @@
         let titleSize = compactCards ? clamp(Math.round(cardH * 0.45), 11, 16) : cardH > 70 ? 21 : 18;
         ctx.fillStyle = item.accent;
         ctx.textAlign = "left";
-        ctx.font = `700 ${titleSize}px 'Noto Sans', 'Outfit', sans-serif`;
+        ctx.font = FONT.bold(titleSize);
         while (titleSize > (compactCards ? 9 : 14) && ctx.measureText(item.name).width > titleMaxW) {
           titleSize -= 1;
-          ctx.font = `700 ${titleSize}px 'Noto Sans', 'Outfit', sans-serif`;
+          ctx.font = FONT.bold(titleSize);
         }
         const titleYCard = y + (compactCards ? cardH * 0.62 : cardH > 70 ? 30 : 26);
         ctx.fillText(item.name, textX, titleYCard);
@@ -2119,10 +2305,10 @@
         if (!compactCards) {
           let descSize = cardH > 70 ? 13 : 12;
           ctx.fillStyle = "rgba(36, 53, 68, 0.76)";
-          ctx.font = `600 ${descSize}px 'Noto Sans', 'Outfit', sans-serif`;
+          ctx.font = FONT.semi(descSize);
           while (descSize > 11 && ctx.measureText(item.desc).width > titleMaxW) {
             descSize -= 1;
-            ctx.font = `600 ${descSize}px 'Noto Sans', 'Outfit', sans-serif`;
+            ctx.font = FONT.semi(descSize);
           }
           ctx.fillText(item.desc, textX, y + cardH - 14);
         }
@@ -2145,7 +2331,7 @@
 
       ctx.textAlign = "center";
       ctx.fillStyle = "#1f3f52";
-      ctx.font = `700 ${compactCards ? 18 : 20}px 'Noto Sans', 'Outfit', sans-serif`;
+      ctx.font = FONT.bold(compactCards ? 18 : 20);
       ctx.fillText(`Kart tıkla veya 1-${LEVELS.length} ile seviyeyi başlat`, panelX + panelW * 0.5, footerPrimaryY + 5);
 
       const secondaryPillW = panelW * 0.86;
@@ -2161,17 +2347,17 @@
       ctx.stroke();
 
       ctx.fillStyle = "rgba(24, 66, 85, 0.76)";
-      ctx.font = "600 17px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.semi(17);
       ctx.fillText("Enter: Başlat | C: Kamera | 0: Menü | F: Tam ekran", panelX + panelW * 0.5, footerSecondaryY + 5);
       return;
     }
 
     if (state.mode === "level_clear") {
       ctx.fillText("SEVİYE TAMAMLANDI", canvas.width * 0.5, panelY + 80);
-      ctx.font = "700 28px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.bold(28);
       ctx.fillStyle = "#16a34a";
       ctx.fillText(`Skor: ${state.score}`, canvas.width * 0.5, panelY + 134);
-      ctx.font = "600 20px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.semi(20);
       ctx.fillStyle = THEME.teal;
       ctx.fillText("Sonraki bölümde daha zor kesirler var.", canvas.width * 0.5, panelY + 182);
       ctx.fillText("Sonraki Seviye butonuna bas.", canvas.width * 0.5, panelY + 220);
@@ -2180,10 +2366,10 @@
 
     if (state.mode === "game_complete") {
       ctx.fillText("GALAKSİ KURTARILDI", canvas.width * 0.5, panelY + 80);
-      ctx.font = "700 31px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.bold(31);
       ctx.fillStyle = "#16a34a";
       ctx.fillText(`Final Skor: ${state.score}`, canvas.width * 0.5, panelY + 136);
-      ctx.font = "600 20px 'Noto Sans', 'Outfit', sans-serif";
+      ctx.font = FONT.semi(20);
       ctx.fillStyle = THEME.teal;
       ctx.fillText("Kamera + sayı doğrusu kombinasyonunu tamamladın.", canvas.width * 0.5, panelY + 188);
       ctx.fillText("Baştan Oyna ile yeni bir tur aç.", canvas.width * 0.5, panelY + 226);
@@ -2213,16 +2399,19 @@
       state.questionCueT = Math.max(0, state.questionCueT - dt);
     }
 
-    for (let i = state.particles.length - 1; i >= 0; i -= 1) {
+    let alive = 0;
+    for (let i = 0; i < state.particles.length; i += 1) {
       const p = state.particles[i];
       p.life -= dt;
       p.vy += 240 * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      if (p.life <= 0) {
-        state.particles.splice(i, 1);
+      if (p.life > 0) {
+        state.particles[alive] = p;
+        alive += 1;
       }
     }
+    state.particles.length = alive;
 
     processCamera(dt);
 
@@ -2263,9 +2452,11 @@
       drawParticles();
       drawQuestionCue();
       drawCameraPreview();
+      drawFingerGuide();
     } else {
       drawParticles();
       drawMenuPanel();
+      drawFingerGuide();
     }
 
     drawImpactFlash();
