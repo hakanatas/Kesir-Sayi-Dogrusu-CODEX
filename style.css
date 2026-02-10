@@ -20,7 +20,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Outfit", system-ui, -apple-system, sans-serif;
+  font-family: "Noto Sans", "Outfit", system-ui, -apple-system, sans-serif;
   color: var(--text);
   background: var(--cream);
   display: flex;
@@ -74,7 +74,7 @@ body::after {
 
 .title-bar h1 {
   margin: 0;
-  font-family: "Forum", "Caudex", serif;
+  font-family: "Noto Serif", "Forum", "Caudex", serif;
   font-size: clamp(1.58rem, 3vw, 2.32rem);
   letter-spacing: 0.02em;
   color: var(--teal);
@@ -113,7 +113,7 @@ canvas {
   border: 1px solid var(--gray-200);
   border-radius: 12px;
   padding: 10px 16px;
-  font: 600 0.94rem "Outfit", sans-serif;
+  font: 600 0.94rem "Noto Sans", "Outfit", sans-serif;
   color: #4b5563;
   background: #fff;
   cursor: pointer;

@@ -31,3 +31,14 @@ TODO / Sonraki ajan notlari:
 - Klavye seviye kisayolu eklendi: `1..6` tuslari ile ilgili seviyeyi direkt baslatir.
 - Baslangic paneli metni ve alt ipucu guncellendi (`1-6 seviye sec`).
 - Regresyon testi alindi (`output/web-game-shortcut-regression`), yeni console error yok.
+- Türkçe karakter düzeltmesi: tüm UI/canvas metinleri UTF-8 Türkçe'ye çevrildi.
+- Font fallback iyileştirildi: `Noto Sans` ve `Noto Serif` eklendi; canvas metinlerinde de bu fontlar kullanılmaya başlandı.
+- Menü yazı kayması düzeltildi:
+  - Menü panel yüksekliği artırıldı.
+  - Satır aralıkları yeniden ayarlandı.
+  - Alt bilgilendirme metni için sarma (wrap) desteği eklendi.
+  - Kamera önizlemesi menü ekranında gizlendi (oyun ekranında kalıyor).
+- Kamera takip iyileştirildi:
+  - Hareket + cilt pikseli birleşik (skin-motion) takip algoritması eklendi.
+  - Üstteki hareketli cilt bölgesinden işaret noktası çıkarımı yapılıyor.
+  - Takip güven skoru (`trackingConfidence`) ve daha dengeli dwell tetikleme eklendi.

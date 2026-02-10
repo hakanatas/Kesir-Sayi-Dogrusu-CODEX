@@ -151,7 +151,7 @@
     return {
       value: num / den,
       label: `${num}/${den}`,
-      tip: "Temel kesir avcisi",
+      tip: "Temel kesir avcısı",
     };
   }
 
@@ -162,7 +162,7 @@
     return {
       value: num / den,
       label: `${num * mul}/${den * mul}`,
-      tip: `${num}/${den} ile esdeger`,
+      tip: `${num}/${den} ile eşdeğer`,
     };
   }
 
@@ -178,7 +178,7 @@
     return {
       value: simplified.num / simplified.den,
       label: `${simplified.num}/${simplified.den}`,
-      tip: "Negatif bolge dikkat ister",
+      tip: "Negatif bölge dikkat ister",
     };
   }
 
@@ -191,7 +191,7 @@
     return {
       value: improperNum / den,
       label: asMixed ? `${whole} ${num}/${den}` : `${improperNum}/${den}`,
-      tip: asMixed ? "Tam + kesir" : "Bilesik kesir",
+      tip: asMixed ? "Tam + kesir" : "Bileşik kesir",
     };
   }
 
@@ -219,14 +219,14 @@
     return {
       value,
       label: fancy,
-      tip: "Kamera boss savasi",
+      tip: "Kamera boss savaşı",
     };
   }
 
   const LEVELS = [
     {
       id: "L1",
-      name: "Kesir Isinmasi",
+      name: "Kesir Isınması",
       range: [0, 1],
       tickStep: 0.125,
       questions: 4,
@@ -238,7 +238,7 @@
     },
     {
       id: "L2",
-      name: "Esdeger Portali",
+      name: "Eşdeğer Portalı",
       range: [0, 1],
       tickStep: 0.125,
       questions: 4,
@@ -262,7 +262,7 @@
     },
     {
       id: "L4",
-      name: "Bilesik Laboratuvar",
+      name: "Bileşik Laboratuvar",
       range: [0, 3],
       tickStep: 0.25,
       questions: 4,
@@ -323,7 +323,7 @@
     elapsedInLevel: 0,
     timeLeft: 0,
     lineShift: 0,
-    feedback: "Kampanyayi baslat ve gezegenlere kesir yolu ciz.",
+    feedback: "Kampanyayı başlat ve gezegenlere kesir yolu çiz.",
     feedbackType: "info",
     feedbackT: 0,
     particles: [],
@@ -352,6 +352,7 @@
       submitCooldown: 0,
       sampleAccumulator: 0,
       lastMotion: 0,
+      trackingConfidence: 0,
       errorText: "",
     },
     hudShakeT: 0,
@@ -412,11 +413,11 @@
     if (level.id === "L1") {
       const warmups = [
         { value: 1 / 2, label: "1/2", tip: "Orta noktayi bul" },
-        { value: 1 / 4, label: "1/4", tip: "Birinci ceyrek" },
-        { value: 3 / 4, label: "3/4", tip: "Ucuncu ceyrek" },
+        { value: 1 / 4, label: "1/4", tip: "Birinci çeyrek" },
+        { value: 3 / 4, label: "3/4", tip: "Üçüncü çeyrek" },
         { value: 1 / 8, label: "1/8", tip: "Sekizde bir" },
-        { value: 7 / 8, label: "7/8", tip: "Sona yakin" },
-        { value: 3 / 8, label: "3/8", tip: "Uc sekizde" },
+        { value: 7 / 8, label: "7/8", tip: "Sona yakın" },
+        { value: 3 / 8, label: "3/8", tip: "Üç sekizde" },
       ];
       return shuffle(warmups).slice(0, level.questions);
     }
@@ -445,7 +446,7 @@
       picked.push({
         value,
         label: toFractionLabel(value, 10),
-        tip: "Serbest atis",
+        tip: "Serbest atış",
       });
     }
 
@@ -455,31 +456,31 @@
   function updateHintText() {
     if (state.mode === "playing" && state.level) {
       const q = currentQuestion();
-      const timerText = state.level.timeLimit > 0 ? ` | Sure: ${state.timeLeft.toFixed(1)} sn` : "";
+      const timerText = state.level.timeLimit > 0 ? ` | Süre: ${state.timeLeft.toFixed(1)} sn` : "";
       const modeText = state.inputMode === "camera" ? "kamera" : "fare/dokunmatik";
       ui.hint.textContent = `Seviye ${state.levelIndex + 1}/${LEVELS.length} (${state.level.name}) | Hedef: ${q ? q.label : "-"} | Can: ${state.lives} | Skor: ${state.score} | Mod: ${modeText}${timerText}`;
       return;
     }
 
     if (state.mode === "level_clear") {
-      ui.hint.textContent = `${state.level ? state.level.name : "Seviye"} tamamlandi. Sonraki bolume gec.`;
+      ui.hint.textContent = `${state.level ? state.level.name : "Seviye"} tamamlandı. Sonraki bölüme geç.`;
       return;
     }
 
     if (state.mode === "game_complete") {
-      ui.hint.textContent = `Harika. Kampanya bitti. Toplam skor: ${state.score}. Tekrar baslatabilirsin.`;
+      ui.hint.textContent = `Harika. Kampanya bitti. Toplam skor: ${state.score}. Tekrar başlatabilirsin.`;
       return;
     }
 
-    ui.hint.textContent = "Klavye: 1-6 seviye sec, 0 menu, Sol/Sag konum, Space/Enter kilitle, C kamera, F tam ekran.";
+    ui.hint.textContent = "Klavye: 1-6 seviye seç, 0 menü, Sol/Sağ konum, Space/Enter kilitle, C kamera, F tam ekran.";
   }
 
   function updateCameraButtonText() {
     if (!state.camera.active) {
-      ui.cameraBtn.textContent = "Kamera: Kapali";
+      ui.cameraBtn.textContent = "Kamera: Kapalı";
       return;
     }
-    ui.cameraBtn.textContent = state.inputMode === "camera" ? "Kamera: Aktif" : "Kamera: Hazir";
+    ui.cameraBtn.textContent = state.inputMode === "camera" ? "Kamera: Aktif" : "Kamera: Hazır";
   }
 
   function updateUI() {
@@ -488,8 +489,8 @@
     ui.nextBtn.hidden = !(state.mode === "level_clear" || state.mode === "game_complete");
     ui.resetBtn.hidden = state.mode === "menu";
 
-    ui.startBtn.textContent = state.hasPlayed ? "Yeniden Baslat" : "Kampanyayi Baslat";
-    ui.nextBtn.textContent = state.mode === "game_complete" ? "Bastan Oyna" : "Sonraki Seviye";
+    ui.startBtn.textContent = state.hasPlayed ? "Yeniden Başlat" : "Kampanyayı Başlat";
+    ui.nextBtn.textContent = state.mode === "game_complete" ? "Baştan Oyna" : "Sonraki Seviye";
 
     updateCameraButtonText();
     updateHintText();
@@ -570,13 +571,13 @@
     state.timeLeft = state.level.timeLimit;
     state.lineShift = 0;
     state.mode = "playing";
-    setFeedback(`Seviye ${index + 1} basladi: ${state.level.name}`, "info", 2.2);
+    setFeedback(`Seviye ${index + 1} başladı: ${state.level.name}`, "info", 2.2);
 
     const center = (state.level.range[0] + state.level.range[1]) * 0.5;
     state.markerValue = center;
 
     if (state.level.cameraFocus && state.inputMode !== "camera") {
-      setFeedback(`Seviye ${index + 1} basladi: ${state.level.name} | Kamera modu tavsiye edilir (C)`, "info", 2.2);
+      setFeedback(`Seviye ${index + 1} başladı: ${state.level.name} | Kamera modu tavsiye edilir (C)`, "info", 2.2);
     }
 
     updateUI();
@@ -616,7 +617,7 @@
     state.lineShift = 0;
     state.timeLeft = 0;
     state.combo = 0;
-    setFeedback("Menuye donuldu.", "info", 1.2);
+    setFeedback("Menüye dönüldü.", "info", 1.2);
     updateUI();
   }
 
@@ -625,7 +626,7 @@
     if (state.questionIndex >= state.questions.length) {
       if (state.levelIndex >= LEVELS.length - 1) {
         state.mode = "game_complete";
-        setFeedback("Butun kesir sistemleri dengelendi.", "success", 3);
+        setFeedback("Bütün kesir sistemleri dengelendi.", "success", 3);
       } else {
         state.mode = "level_clear";
         setFeedback(`${state.level.name} temizlendi.`, "success", 2.6);
@@ -660,7 +661,7 @@
       state.score += gain;
       state.levelScore += 1;
       state.combo += 1;
-      setFeedback(`DOGRU! ${question.label} bulundu. +${gain} puan`, "success", 2.4);
+      setFeedback(`DOĞRU! ${question.label} bulundu. +${gain} puan`, "success", 2.4);
       triggerFlash("22, 163, 74", 0.18);
       spawnParticles(valueToX(question.value), getLineGeometry().y - 6, "#2fbf71", 22);
 
@@ -670,12 +671,12 @@
       const previousLives = state.lives;
       state.lives -= 1;
       state.combo = 0;
-      setFeedback(`YANLIS! Hedef ${question.label}. Can -1 (${previousLives} -> ${state.lives})`, "error", 3);
+      setFeedback(`YANLIŞ! Hedef ${question.label}. Can -1 (${previousLives} -> ${state.lives})`, "error", 3);
       triggerDamageFeedback(previousLives, state.lives);
       spawnParticles(valueToX(state.markerValue), getLineGeometry().y - 6, "#e65100", 16);
 
       if (state.lives <= 0) {
-        setFeedback("Canlar bitti. Kampanyayi yeniden baslat.", "error", 2.8);
+        setFeedback("Canlar bitti. Kampanyayı yeniden başlat.", "error", 2.8);
         state.mode = "menu";
         updateUI();
         return;
@@ -691,11 +692,11 @@
     const previousLives = state.lives;
     state.lives -= 1;
     state.combo = 0;
-    setFeedback(`SURE DOLDU! Can -1 (${previousLives} -> ${state.lives})`, "warning", 2.4);
+    setFeedback(`SÜRE DOLDU! Can -1 (${previousLives} -> ${state.lives})`, "warning", 2.4);
     triggerDamageFeedback(previousLives, state.lives);
 
     if (state.lives <= 0) {
-      setFeedback("Sureyi yetistiremedin. Yeniden dene.", "error", 2.8);
+      setFeedback("Süreyi yetiştiremedin. Yeniden dene.", "error", 2.8);
       state.mode = "menu";
       updateUI();
       return;
@@ -721,7 +722,7 @@
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      state.camera.errorText = "Tarayici kamera API yok.";
+      state.camera.errorText = "Tarayıcı kamera API'si yok.";
       setFeedback(state.camera.errorText, "warning", 2.2);
       return false;
     }
@@ -748,11 +749,12 @@
       state.camera.submitCooldown = 0;
       state.camera.sampleAccumulator = 0;
       state.camera.lastMotion = 0;
+      state.camera.trackingConfidence = 0;
       state.camera.errorText = "";
       updateCameraButtonText();
       return true;
     } catch (error) {
-      state.camera.errorText = "Kamera acilamadi. Izin verip tekrar dene.";
+      state.camera.errorText = "Kamera açılamadı. İzin verip tekrar dene.";
       setFeedback(state.camera.errorText, "warning", 2.6);
       return false;
     }
@@ -769,6 +771,7 @@
     state.camera.active = false;
     state.camera.baselineReady = false;
     state.camera.lastMotion = 0;
+    state.camera.trackingConfidence = 0;
     updateCameraButtonText();
   }
 
@@ -787,8 +790,22 @@
     }
 
     state.inputMode = "camera";
-    setFeedback("Kamera imleci aktif. Parmagini hareket ettir, sabit tutunca kilitler.", "info", 2.4);
+    setFeedback("Kamera imleci aktif. Parmağını hareket ettir, sabit tutunca kilitler.", "info", 2.4);
     updateUI();
+  }
+
+  function isSkinPixel(r, g, b) {
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const rgbRule = r > 95 && g > 40 && b > 20 && max - min > 15 && Math.abs(r - g) > 15 && r > g && r > b;
+    if (!rgbRule) {
+      return false;
+    }
+
+    const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+    const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+    const ycbcrRule = cr >= 135 && cr <= 180 && cb >= 85 && cb <= 135;
+    return ycbcrRule;
   }
 
   function processCamera(dt) {
@@ -797,7 +814,7 @@
     }
 
     state.camera.sampleAccumulator += dt;
-    if (state.camera.sampleAccumulator < 0.07) {
+    if (state.camera.sampleAccumulator < 0.05) {
       return;
     }
     state.camera.sampleAccumulator = 0;
@@ -815,62 +832,124 @@
     }
 
     let motion = 0;
-    let xSum = 0;
-    let ySum = 0;
+    let motionX = 0;
+    let motionY = 0;
+    let skinCount = 0;
+    let movingSkinCount = 0;
+    let topY = CAM_H + 1;
+    let topXSum = 0;
+    let topCount = 0;
+    const previousPointerX = state.camera.pointerX;
 
     for (let i = 0; i < CAM_W * CAM_H; i += 1) {
       const p = i * 4;
+      const r = pixels[p];
+      const g = pixels[p + 1];
+      const b = pixels[p + 2];
       const gray = Math.round(pixels[p] * 0.299 + pixels[p + 1] * 0.587 + pixels[p + 2] * 0.114);
       state.camera.currFrame[i] = gray;
       const diff = Math.abs(gray - state.camera.prevFrame[i]);
-      if (diff < 25) {
-        continue;
-      }
       const x = i % CAM_W;
       const y = Math.floor(i / CAM_W);
-      if (y > CAM_H * 0.92) {
+      if (y < CAM_H * 0.1 || y > CAM_H * 0.94) {
         continue;
       }
-      motion += diff;
-      xSum += x * diff;
-      ySum += y * diff;
+
+      const skin = isSkinPixel(r, g, b);
+      if (skin) {
+        skinCount += 1;
+      }
+
+      if (skin && diff > 10) {
+        movingSkinCount += 1;
+        motion += diff;
+        motionX += x * diff;
+        motionY += y * diff;
+
+        if (y < topY - 1) {
+          topY = y;
+          topXSum = x;
+          topCount = 1;
+        } else if (Math.abs(y - topY) <= 4) {
+          topXSum += x;
+          topCount += 1;
+        }
+      } else if (diff > 24) {
+        const weightedDiff = diff * 0.35;
+        motion += weightedDiff;
+        motionX += x * weightedDiff;
+        motionY += y * weightedDiff;
+      }
     }
 
     const temp = state.camera.prevFrame;
     state.camera.prevFrame = state.camera.currFrame;
     state.camera.currFrame = temp;
 
-    if (motion > 17000) {
-      const nx = xSum / motion / CAM_W;
-      const ny = ySum / motion / CAM_H;
-      state.camera.pointerX = lerp(state.camera.pointerX, nx, 0.35);
-      state.camera.pointerY = lerp(state.camera.pointerY, ny, 0.35);
-      state.camera.lastMotion = motion;
+    const hasSkinTop = topCount >= 4 && movingSkinCount > 24 && skinCount > 80;
+    const hasMotion = motion > 900;
+    let nextX = 0;
+    let nextY = 0;
+    let tracked = false;
+    let confidence = 0;
 
-      if (state.mode === "playing" && state.level && state.inputMode === "camera") {
-        const line = getLineGeometry();
-        const mirroredX = 1 - state.camera.pointerX;
-        const canvasX = line.x + mirroredX * line.width;
-        setMarkerFromCanvasX(canvasX);
+    if (hasSkinTop) {
+      nextX = topXSum / topCount / CAM_W;
+      nextY = topY / CAM_H;
+      tracked = true;
+      confidence += 0.55;
+    }
 
-        if (Math.abs(state.camera.pointerX - state.camera.lastStableX) < 0.012) {
-          state.camera.dwell += 0.07;
-        } else {
-          state.camera.dwell = 0;
-          state.camera.lastStableX = state.camera.pointerX;
-        }
-
-        state.camera.submitCooldown = Math.max(0, state.camera.submitCooldown - 0.07);
-        if (state.camera.dwell > 1.1 && state.camera.submitCooldown <= 0) {
-          submitGuess("camera-dwell");
-          state.camera.dwell = 0;
-          state.camera.submitCooldown = 1.4;
-        }
+    if (hasMotion) {
+      const mx = motionX / motion / CAM_W;
+      const my = motionY / motion / CAM_H;
+      if (!tracked) {
+        nextX = mx;
+        nextY = my;
+        tracked = true;
+      } else {
+        nextX = lerp(nextX, mx, 0.28);
+        nextY = lerp(nextY, my, 0.28);
       }
+      confidence += 0.45;
+    }
+
+    if (tracked) {
+      const smoothX = hasSkinTop ? 0.38 : 0.3;
+      const smoothY = hasSkinTop ? 0.34 : 0.3;
+      state.camera.pointerX = lerp(state.camera.pointerX, clamp(nextX, 0, 1), smoothX);
+      state.camera.pointerY = lerp(state.camera.pointerY, clamp(nextY, 0, 1), smoothY);
+      state.camera.lastMotion = motion;
+      state.camera.trackingConfidence = clamp(confidence, 0, 1);
     } else {
       state.camera.lastMotion = Math.max(0, state.camera.lastMotion * 0.85);
+      state.camera.trackingConfidence = Math.max(0, state.camera.trackingConfidence * 0.85);
+    }
+
+    if (state.mode === "playing" && state.level && state.inputMode === "camera") {
+      const line = getLineGeometry();
+      const mirroredX = 1 - state.camera.pointerX;
+      const canvasX = line.x + mirroredX * line.width;
+      setMarkerFromCanvasX(canvasX);
+
+      const deltaX = Math.abs(state.camera.pointerX - previousPointerX);
+      const stableThreshold = state.camera.trackingConfidence > 0.7 ? 0.008 : 0.006;
+      if (deltaX < stableThreshold) {
+        state.camera.dwell += 0.05;
+      } else {
+        state.camera.dwell = Math.max(0, state.camera.dwell - 0.05);
+        state.camera.lastStableX = state.camera.pointerX;
+      }
+
+      state.camera.submitCooldown = Math.max(0, state.camera.submitCooldown - 0.05);
+      if (state.camera.dwell > 0.95 && state.camera.submitCooldown <= 0 && state.camera.trackingConfidence > 0.35) {
+        submitGuess("camera-dwell");
+        state.camera.dwell = 0;
+        state.camera.submitCooldown = 1.3;
+      }
+    } else {
       state.camera.dwell = Math.max(0, state.camera.dwell - 0.05);
-      state.camera.submitCooldown = Math.max(0, state.camera.submitCooldown - 0.07);
+      state.camera.submitCooldown = Math.max(0, state.camera.submitCooldown - 0.05);
     }
   }
 
@@ -976,7 +1055,7 @@
     ctx.stroke();
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "700 20px 'Outfit', sans-serif";
+    ctx.font = "700 20px 'Noto Sans', 'Outfit', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("ONAYLA", confirmRect.x + confirmRect.w * 0.5, confirmRect.y + confirmRect.h * 0.52);
@@ -998,16 +1077,16 @@
 
     ctx.fillStyle = THEME.teal;
     ctx.textAlign = "left";
-    ctx.font = "700 30px 'Forum', 'Caudex', serif";
+    ctx.font = "700 30px 'Noto Serif', 'Forum', 'Caudex', serif";
     ctx.fillText(`Seviye ${state.levelIndex + 1}: ${state.level ? state.level.name : "-"}`, canvas.width * 0.05, canvas.height * 0.1);
 
-    ctx.font = "700 28px 'Outfit', sans-serif";
+    ctx.font = "700 28px 'Noto Sans', 'Outfit', sans-serif";
     ctx.fillStyle = THEME.darkTeal;
     ctx.fillText(`Hedef Kesir: ${q ? q.label : "-"}`, canvas.width * 0.05, canvas.height * 0.16);
 
     ctx.textAlign = "right";
     ctx.fillStyle = THEME.text;
-    ctx.font = "700 22px 'Outfit', sans-serif";
+    ctx.font = "700 22px 'Noto Sans', 'Outfit', sans-serif";
     ctx.fillText(`Skor ${state.score}`, rightX, canvas.height * 0.1);
 
     ctx.fillStyle = state.lifeDropT > 0 ? "#b91c1c" : THEME.text;
@@ -1047,7 +1126,7 @@
 
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
-      ctx.font = "700 18px 'Outfit', sans-serif";
+      ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
       ctx.textBaseline = "middle";
       ctx.fillText(state.lifeDropText, bx + bw * 0.5, by + bh * 0.52);
       ctx.textBaseline = "alphabetic";
@@ -1072,16 +1151,16 @@
       ctx.fill();
 
       ctx.fillStyle = THEME.darkTeal;
-      ctx.font = "600 14px 'Outfit', sans-serif";
+      ctx.font = "600 14px 'Noto Sans', 'Outfit', sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(`${state.timeLeft.toFixed(1)} sn`, timerX + timerW * 0.5, timerY - 4);
     }
 
     ctx.textAlign = "left";
     ctx.fillStyle = THEME.muted;
-    ctx.font = "600 15px 'Outfit', sans-serif";
+    ctx.font = "600 15px 'Noto Sans', 'Outfit', sans-serif";
     if (q) {
-      ctx.fillText(`Ipucu: ${q.tip}`, canvas.width * 0.05, canvas.height * 0.215);
+      ctx.fillText(`İpucu: ${q.tip}`, canvas.width * 0.05, canvas.height * 0.215);
     }
   }
 
@@ -1103,10 +1182,10 @@
     }
 
     const palette = {
-      info: { bg: "rgba(34, 73, 90, 0.92)", border: "rgba(26, 54, 66, 0.98)", chip: "#163642", chipText: "BILGI" },
-      success: { bg: "rgba(22, 163, 74, 0.93)", border: "rgba(21, 128, 61, 0.98)", chip: "#166534", chipText: "DOGRU" },
-      error: { bg: "rgba(220, 38, 38, 0.94)", border: "rgba(153, 27, 27, 0.98)", chip: "#991b1b", chipText: "YANLIS" },
-      warning: { bg: "rgba(234, 88, 12, 0.94)", border: "rgba(194, 65, 12, 0.98)", chip: "#9a3412", chipText: "SURE" },
+      info: { bg: "rgba(34, 73, 90, 0.92)", border: "rgba(26, 54, 66, 0.98)", chip: "#163642", chipText: "BİLGİ" },
+      success: { bg: "rgba(22, 163, 74, 0.93)", border: "rgba(21, 128, 61, 0.98)", chip: "#166534", chipText: "DOĞRU" },
+      error: { bg: "rgba(220, 38, 38, 0.94)", border: "rgba(153, 27, 27, 0.98)", chip: "#991b1b", chipText: "YANLIŞ" },
+      warning: { bg: "rgba(234, 88, 12, 0.94)", border: "rgba(194, 65, 12, 0.98)", chip: "#9a3412", chipText: "SÜRE" },
     };
     const style = palette[state.feedbackType] || palette.info;
     const alpha = clamp(state.feedbackT / 3, 0, 1);
@@ -1136,11 +1215,11 @@
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "700 18px 'Outfit', sans-serif";
+    ctx.font = "700 18px 'Noto Sans', 'Outfit', sans-serif";
     ctx.fillText(style.chipText, chipX + chipW * 0.5, chipY + chipH * 0.52);
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "700 24px 'Outfit', sans-serif";
+    ctx.font = "700 24px 'Noto Sans', 'Outfit', sans-serif";
     ctx.textAlign = "left";
     ctx.fillText(state.feedback, chipX + chipW + 20, y + h * 0.52);
     ctx.textBaseline = "alphabetic";
@@ -1192,14 +1271,42 @@
     ctx.stroke();
 
     ctx.fillStyle = THEME.darkTeal;
-    ctx.font = "600 13px 'Outfit', sans-serif";
+    ctx.font = "600 13px 'Noto Sans', 'Outfit', sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(`motion ${Math.round(state.camera.lastMotion)}`, x, y + h + 18);
+    const confidenceText = Math.round(state.camera.trackingConfidence * 100);
+    ctx.fillText(`hareket ${Math.round(state.camera.lastMotion)} | takip %${confidenceText}`, x, y + h + 18);
+  }
+
+  function drawCenteredWrappedText(text, centerX, startY, maxWidth, lineHeight) {
+    const words = text.split(/\s+/).filter(Boolean);
+    const lines = [];
+    let current = "";
+
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        current = candidate;
+      } else {
+        if (current) {
+          lines.push(current);
+        }
+        current = word;
+      }
+    }
+    if (current) {
+      lines.push(current);
+    }
+
+    ctx.textAlign = "center";
+    lines.forEach((line, index) => {
+      ctx.fillText(line, centerX, startY + lineHeight * index);
+    });
+    return lines.length;
   }
 
   function drawMenuPanel() {
     const panelW = canvas.width * 0.78;
-    const panelH = canvas.height * 0.56;
+    const panelH = state.mode === "menu" ? canvas.height * 0.66 : canvas.height * 0.56;
     const panelX = (canvas.width - panelW) * 0.5;
     const panelY = canvas.height * 0.2;
 
@@ -1213,20 +1320,20 @@
 
     ctx.textAlign = "center";
     ctx.fillStyle = THEME.teal;
-    ctx.font = "700 48px 'Forum', 'Caudex', serif";
+    ctx.font = "700 48px 'Noto Serif', 'Forum', 'Caudex', serif";
 
     if (state.mode === "menu") {
-      ctx.fillText("KESIR KASIFI", canvas.width * 0.5, panelY + 74);
-      ctx.font = "600 20px 'Outfit', sans-serif";
-      ctx.fillText("Fare, dokunmatik veya kamera ile hedef kesri sayi dogrusuna yerlestir.", canvas.width * 0.5, panelY + 116);
+      ctx.fillText("KESİR KÂŞİFİ", canvas.width * 0.5, panelY + 74);
+      ctx.font = "600 20px 'Noto Sans', 'Outfit', sans-serif";
+      drawCenteredWrappedText("Fare, dokunmatik veya kamera ile hedef kesri sayı doğrusuna yerleştir.", canvas.width * 0.5, panelY + 116, panelW * 0.86, 28);
 
       ctx.textAlign = "left";
-      ctx.font = "600 18px 'Outfit', sans-serif";
+      ctx.font = "600 18px 'Noto Sans', 'Outfit', sans-serif";
       const items = [
-        "1) Kesir Isinmasi (0-1)",
-        "2) Esdeger Portali",
+        "1) Kesir Isınması (0-1)",
+        "2) Eşdeğer Portalı",
         "3) Negatif Kanyon",
-        "4) Bilesik Laboratuvar",
+        "4) Bileşik Laboratuvar",
         "5) Kayan Hat Sprint",
         "6) Kamera Boss (parmak modu)",
       ];
@@ -1234,39 +1341,39 @@
         const row = Math.floor(i / 2);
         const col = i % 2;
         const x = panelX + 42 + col * (panelW * 0.5 - 24);
-        const y = panelY + 170 + row * 58;
+        const y = panelY + 188 + row * 68;
         ctx.fillStyle = i === 5 ? "#1a3642" : "#22495a";
         ctx.fillText(item, x, y);
       });
 
       ctx.textAlign = "center";
-      ctx.font = "600 17px 'Outfit', sans-serif";
+      ctx.font = "600 17px 'Noto Sans', 'Outfit', sans-serif";
       ctx.fillStyle = "#4b5563";
-      ctx.fillText("Baslat: buton veya 1-6 | Menu: 0 | Kamera: C | Tam ekran: F", canvas.width * 0.5, panelY + panelH - 38);
+      drawCenteredWrappedText("Başlat: buton veya 1-6 | Menü: 0 | Kamera: C | Tam ekran: F", canvas.width * 0.5, panelY + panelH - 56, panelW * 0.88, 24);
       return;
     }
 
     if (state.mode === "level_clear") {
-      ctx.fillText("SEVIYE TAMAMLANDI", canvas.width * 0.5, panelY + 80);
-      ctx.font = "700 28px 'Outfit', sans-serif";
+      ctx.fillText("SEVİYE TAMAMLANDI", canvas.width * 0.5, panelY + 80);
+      ctx.font = "700 28px 'Noto Sans', 'Outfit', sans-serif";
       ctx.fillStyle = "#16a34a";
       ctx.fillText(`Skor: ${state.score}`, canvas.width * 0.5, panelY + 134);
-      ctx.font = "600 20px 'Outfit', sans-serif";
+      ctx.font = "600 20px 'Noto Sans', 'Outfit', sans-serif";
       ctx.fillStyle = THEME.teal;
-      ctx.fillText("Sonraki bolumde daha zor kesirler var.", canvas.width * 0.5, panelY + 182);
+      ctx.fillText("Sonraki bölümde daha zor kesirler var.", canvas.width * 0.5, panelY + 182);
       ctx.fillText("Sonraki Seviye butonuna bas.", canvas.width * 0.5, panelY + 220);
       return;
     }
 
     if (state.mode === "game_complete") {
-      ctx.fillText("GALAKSI KURTARILDI", canvas.width * 0.5, panelY + 80);
-      ctx.font = "700 31px 'Outfit', sans-serif";
+      ctx.fillText("GALAKSİ KURTARILDI", canvas.width * 0.5, panelY + 80);
+      ctx.font = "700 31px 'Noto Sans', 'Outfit', sans-serif";
       ctx.fillStyle = "#16a34a";
       ctx.fillText(`Final Skor: ${state.score}`, canvas.width * 0.5, panelY + 136);
-      ctx.font = "600 20px 'Outfit', sans-serif";
+      ctx.font = "600 20px 'Noto Sans', 'Outfit', sans-serif";
       ctx.fillStyle = THEME.teal;
-      ctx.fillText("Kamera + sayi dogrusu kombinasyonunu tamamladin.", canvas.width * 0.5, panelY + 188);
-      ctx.fillText("Bastan Oyna ile yeni bir tur ac.", canvas.width * 0.5, panelY + 226);
+      ctx.fillText("Kamera + sayı doğrusu kombinasyonunu tamamladın.", canvas.width * 0.5, panelY + 188);
+      ctx.fillText("Baştan Oyna ile yeni bir tur aç.", canvas.width * 0.5, panelY + 226);
     }
   }
 
@@ -1336,7 +1443,6 @@
     } else {
       drawParticles();
       drawMenuPanel();
-      drawCameraPreview();
     }
 
     drawImpactFlash();
@@ -1581,7 +1687,18 @@
     requestAnimationFrame(frame);
   }
 
-  updateUI();
-  render();
-  requestAnimationFrame(frame);
+  async function boot() {
+    updateUI();
+    if (document.fonts && document.fonts.ready) {
+      try {
+        await document.fonts.ready;
+      } catch {
+        // Font promise errors should not block gameplay.
+      }
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  void boot();
 })();
