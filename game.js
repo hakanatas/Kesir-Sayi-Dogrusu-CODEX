@@ -1104,16 +1104,33 @@
       return false;
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        },
-        audio: false,
-      });
+    // Önce ön kamera dene, başarısız olursa herhangi bir kamerayı aç (Raspberry Pi uyumu)
+    const videoConstraints = [
+      { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+      { width: { ideal: 640 }, height: { ideal: 480 } },
+      true,
+    ];
 
+    let stream = null;
+    let lastError = null;
+
+    for (const constraint of videoConstraints) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: constraint, audio: false });
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (!stream) {
+      const reason = lastError ? `${lastError.name}: ${lastError.message}` : "Bilinmeyen hata";
+      state.camera.errorText = `Kamera açılamadı — ${reason}`;
+      setFeedback(state.camera.errorText, "warning", 4);
+      return false;
+    }
+
+    try {
       state.camera.stream = stream;
       cameraVideo.srcObject = stream;
       await cameraVideo.play();
@@ -1135,8 +1152,10 @@
       updateCameraButtonText();
       return true;
     } catch (error) {
-      state.camera.errorText = "Kamera açılamadı. İzin verip tekrar dene.";
-      setFeedback(state.camera.errorText, "warning", 2.6);
+      stream.getTracks().forEach((t) => t.stop());
+      const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      state.camera.errorText = `Kamera başlatılamadı — ${reason}`;
+      setFeedback(state.camera.errorText, "warning", 4);
       return false;
     }
   }

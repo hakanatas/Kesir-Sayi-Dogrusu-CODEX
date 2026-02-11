@@ -187,3 +187,13 @@ canvas {
     text-align: center;
   }
 }
+
+.site-footer {
+  width: min(1220px, 96vw);
+  margin: 0 auto;
+  padding: 14px 0 18px;
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--gray-400);
+  letter-spacing: 0.01em;
+}
