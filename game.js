@@ -786,13 +786,17 @@
   }
 
   async function ensureAutoCameraMode() {
+    console.log("[KesirKamera] ensureAutoCameraMode() çağrıldı");
     if (!AUTO_LOOP_VARIANT) {
+      console.log("[KesirKamera] AUTO_LOOP_VARIANT kapalı, çıkılıyor");
       return;
     }
     if (state.inputMode === "camera" && state.camera.active) {
+      console.log("[KesirKamera] Kamera zaten aktif");
       return;
     }
     const ok = await ensureCameraActive();
+    console.log("[KesirKamera] ensureCameraActive sonucu:", ok);
     if (!ok) {
       return;
     }
@@ -2753,6 +2757,7 @@
   }
 
   async function boot() {
+    console.log("[KesirKamera] boot() başladı — v4");
     updateUI();
     if (document.fonts && document.fonts.ready) {
       try {
@@ -2764,10 +2769,14 @@
     render();
     if (AUTO_LOOP_VARIANT) {
       startCampaignFromLevel(0);
-      void ensureAutoCameraMode();
+      try {
+        await ensureAutoCameraMode();
+      } catch (err) {
+        console.error("[KesirKamera] ensureAutoCameraMode hatası:", err);
+      }
     }
     requestAnimationFrame(frame);
   }
 
-  void boot();
+  boot().catch((err) => console.error("[KesirKamera] boot hatası:", err));
 })();
