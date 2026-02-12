@@ -63,7 +63,7 @@
         }
       }
       if (audioCtx.state === "suspended") {
-        audioCtx.resume().catch(() => {});
+        audioCtx.resume().catch(() => { });
       }
       return audioCtx;
     }
@@ -595,6 +595,9 @@
       sampleAccumulator: 0,
       lastMotion: 0,
       trackingConfidence: 0,
+      failed: false,
+      errorState: false,
+      retryRect: null,
       tracker: "basic",
       indexFingerVisible: false,
       ml: {
@@ -795,12 +798,10 @@
       console.log("[KesirKamera] Kamera zaten aktif");
       return;
     }
+    // Auto mode should try at least once, but if it fails, it stays in camera mode to show error
     const ok = await ensureCameraActive();
     console.log("[KesirKamera] ensureCameraActive sonucu:", ok);
-    if (!ok) {
-      return;
-    }
-    state.inputMode = "camera";
+    state.inputMode = "camera"; // Force camera mode to show error UI if failed
     setFeedback("☝️ Kamera aktif — İşaret parmağını kaldır ve kesri doğru noktaya sürükle!", "info", 2.4);
     updateUI();
   }
@@ -1102,16 +1103,22 @@
       return true;
     }
 
+    state.camera.errorState = false;
+    state.camera.failed = false;
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       state.camera.errorText = "Tarayıcı kamera API'si yok.";
+      state.camera.failed = true;
+      state.camera.errorState = true;
       setFeedback(state.camera.errorText, "warning", 2.2);
       console.warn("[KesirKamera] getUserMedia API bulunamadı");
       return false;
     }
 
-    // Raspberry Pi uyumu: alan_cevre ile aynı constraint yapısı
+    // Raspberry Pi uyumu: alan_cevre ile aynı constraint yapısı + 1080p
     const videoConstraints = [
       { width: 1280, height: 720 },
+      { width: 1920, height: 1080 },
       { width: { ideal: 640 }, height: { ideal: 480 } },
       true,
     ];
@@ -1134,8 +1141,10 @@
 
     if (!stream) {
       const reason = lastError ? `${lastError.name}: ${lastError.message}` : "Bilinmeyen hata";
-      state.camera.errorText = `Kamera açılamadı — ${reason}`;
-      setFeedback(state.camera.errorText, "warning", 4);
+      state.camera.failed = true;
+      state.camera.errorState = true;
+      await diagnoseCameraError(reason);
+      setFeedback("Kamera açılamadı. Lütfen izinleri kontrol et.", "warning", 4);
       console.error("[KesirKamera] Tüm constraint'ler başarısız:", reason);
       return false;
     }
@@ -1173,17 +1182,43 @@
       state.camera.ml.lastSeen = 0;
       state.camera.ml.lastInference = 0;
       state.camera.errorText = "";
+      state.camera.failed = false;
       void ensureMlTracker();
       updateCameraButtonText();
       return true;
     } catch (error) {
       stream.getTracks().forEach((t) => t.stop());
       const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-      state.camera.errorText = `Kamera başlatılamadı — ${reason}`;
-      setFeedback(state.camera.errorText, "warning", 4);
+      state.camera.failed = true;
+      state.camera.errorState = true;
+      await diagnoseCameraError(reason);
+      setFeedback("Kamera başlatılamadı.", "warning", 4);
       return false;
     }
   }
+
+  async function diagnoseCameraError(originalError) {
+    let details = `Hata: ${originalError}`;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
+      details += ` | Cihazlar: ${videoDevices.length} video, ${devices.length} toplam.`;
+      if (videoDevices.length === 0) {
+        details += " (Kamera bulunamadı)";
+        if (navigator.userAgent.includes("Linux") && navigator.userAgent.includes("arm")) {
+          details += "\nİPUCU: RPi'de libcamera ayarlarını kontrol et.";
+        }
+      } else {
+        const labels = videoDevices.map((d) => d.label || "İsimsiz").join(", ");
+        details += ` [${labels}]`;
+      }
+    } catch (err) {
+      details += ` | Cihaz tarama hatası: ${err.message}`;
+    }
+    state.camera.errorText = details;
+    console.warn("[KesirKamera] Tanı:", details);
+  }
+
 
   function stopCamera() {
     if (!state.camera.stream) {
@@ -2104,7 +2139,51 @@
     const x = canvas.width * 0.76;
     const y = state.mode === "playing" ? canvas.height * 0.28 : canvas.height * 0.04;
 
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    // Kamera hatası varsa overlay ve retry butonu çiz
+    if (state.camera.errorState) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 12);
+      ctx.fill();
+
+      ctx.fillStyle = "#ef4444";
+      ctx.textAlign = "center";
+      ctx.font = FONT.bold(16);
+      ctx.fillText("KAMERA HATASI", x + w * 0.5, y + 24);
+
+      ctx.fillStyle = "#e5e7eb";
+      ctx.font = FONT.semi(11);
+
+      const errorLines = wrapTextLines(state.camera.errorText, w - 16);
+      const outputLines = errorLines.slice(0, 4); // İlk 4 satırı göster
+      outputLines.forEach((line, i) => {
+        ctx.fillText(line, x + w * 0.5, y + 48 + i * 14);
+      });
+
+      const btnW = w * 0.7;
+      const btnH = 28;
+      const btnX = x + (w - btnW) * 0.5;
+      const btnY = y + h - 36;
+
+      state.camera.retryRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+      const hovering = pointInRect(state.pointer, state.camera.retryRect);
+      ctx.fillStyle = hovering ? "#3b82f6" : "#2563eb";
+      ctx.beginPath();
+      ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = FONT.bold(13);
+      ctx.fillText("TEKRAR DENE", btnX + btnW * 0.5, btnY + 19);
+      return;
+    } else {
+      state.camera.retryRect = null;
+    }
+
+    if (!state.camera.active || cameraVideo.readyState < 2) {
+      return;
+    }
     ctx.beginPath();
     ctx.roundRect(x - 5, y - 5, w + 10, h + 10, 12);
     ctx.fill();
@@ -2511,10 +2590,22 @@
     canvas.setPointerCapture(event.pointerId);
 
     if (state.mode === "menu") {
+      // Eğer menüde de kamera hatası varsa (auto loop durumunda olabilir), retry butonunu kontrol et
+      if (state.camera.errorState && state.camera.retryRect && pointInRect(point, state.camera.retryRect)) {
+        ensureCameraActive();
+        return;
+      }
+
       const clickedLevel = getMenuLevelIndexAtPoint(point);
       if (clickedLevel !== -1) {
         startCampaignFromLevel(clickedLevel);
       }
+      return;
+    }
+
+    // Kamera hata durumunda retry butonu
+    if (state.camera.errorState && state.camera.retryRect && pointInRect(point, state.camera.retryRect)) {
+      ensureCameraActive();
       return;
     }
 
@@ -2699,10 +2790,10 @@
       mode: state.mode,
       level: state.level
         ? {
-            index: state.levelIndex + 1,
-            id: state.level.id,
-            name: state.level.name,
-          }
+          index: state.levelIndex + 1,
+          id: state.level.id,
+          name: state.level.name,
+        }
         : null,
       inputMode: state.inputMode,
       score: state.score,
@@ -2710,21 +2801,21 @@
       totalSolvedAllTime: state.totalSolvedAllTime,
       question: question
         ? {
-            index: state.questionIndex + 1,
-            total: state.questions.length,
-            label: question.label,
-            value: Number(question.value.toFixed(4)),
-          }
+          index: state.questionIndex + 1,
+          total: state.questions.length,
+          label: question.label,
+          value: Number(question.value.toFixed(4)),
+        }
         : null,
       line: state.level
         ? {
-            pixelStart: Number(line.x.toFixed(2)),
-            pixelEnd: Number((line.x + line.width).toFixed(2)),
-            visualMin: Number(visual.min.toFixed(4)),
-            visualMax: Number(visual.max.toFixed(4)),
-            markerValue: Number(state.markerValue.toFixed(4)),
-            markerX: Number(valueToX(state.markerValue).toFixed(2)),
-          }
+          pixelStart: Number(line.x.toFixed(2)),
+          pixelEnd: Number((line.x + line.width).toFixed(2)),
+          visualMin: Number(visual.min.toFixed(4)),
+          visualMax: Number(visual.max.toFixed(4)),
+          markerValue: Number(state.markerValue.toFixed(4)),
+          markerX: Number(valueToX(state.markerValue).toFixed(2)),
+        }
         : null,
       timer: state.level && state.level.timeLimit > 0 ? Number(state.timeLeft.toFixed(2)) : null,
       feedback: state.feedback,
